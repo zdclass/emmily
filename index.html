@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>英文運動單字閃卡</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans TC', sans-serif;
+        }
+        .perspective {
+            perspective: 1000px;
+        }
+        .card {
+            transform-style: preserve-3d;
+            transition: transform 0.6s;
+        }
+        .card.is-flipped {
+            transform: rotateY(180deg);
+        }
+        .card-face {
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+        }
+        .card-back {
+            transform: rotateY(180deg);
+        }
+        .spell-input {
+            transition: all 0.2s ease-in-out;
+        }
+        .correct-input {
+            border-color: #22c55e;
+            color: #22c55e;
+            transform: scale(1.1);
+        }
+        .incorrect-input {
+            border-color: #ef4444;
+            animation: shake 0.5s;
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+    </style>
+</head>
+<body class="bg-blue-50 flex items-center justify-center min-h-screen p-4">
+
+    <div id="app" class="w-full max-w-md mx-auto">
+        <h1 class="text-3xl font-bold text-center text-blue-800 mb-6">運動單字閃卡</h1>
+        
+        <!-- Flashcard Section -->
+        <div class="perspective mb-6">
+            <div id="flashcard" class="card relative w-full h-56 cursor-pointer">
+                <!-- Front of the card (Chinese) -->
+                <div id="card-front" class="card-face absolute w-full h-full rounded-2xl bg-white shadow-lg flex items-center justify-center p-4 border-2 border-blue-200">
+                    <p class="text-5xl font-bold text-blue-600"></p>
+                </div>
+                <!-- Back of the card (English) -->
+                <div id="card-back" class="card-back card-face absolute w-full h-full rounded-2xl bg-blue-500 shadow-lg flex flex-col items-center justify-center p-4">
+                    <p id="english-word" class="text-5xl font-bold text-white"></p>
+                    <button id="speak-button" class="mt-4 text-white text-2xl">
+                        <i class="fas fa-volume-up"></i>
+                        <span class="text-sm ml-2">點我發音</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation Buttons -->
+        <div class="flex justify-between items-center mb-6">
+            <button id="prev-button" class="bg-white hover:bg-gray-100 text-gray-800 font-bold py-3 px-5 rounded-full shadow-md transition-transform transform hover:scale-105">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            <div id="card-counter" class="text-lg font-semibold text-gray-600"></div>
+            <button id="next-button" class="bg-white hover:bg-gray-100 text-gray-800 font-bold py-3 px-5 rounded-full shadow-md transition-transform transform hover:scale-105">
+                <i class="fas fa-arrow-right"></i>
+            </button>
+        </div>
+
+        <!-- Spelling Section -->
+        <div class="bg-white p-6 rounded-2xl shadow-lg">
+            <h2 class="text-xl font-bold text-gray-700 mb-4 text-center">拼字練習</h2>
+            <div id="spelling-area" class="flex justify-center items-center gap-2 mb-4 flex-wrap">
+                <!-- Spelling input boxes will be generated here -->
+            </div>
+            <div id="feedback-message" class="text-center font-bold h-6 transition-opacity duration-300"></div>
+        </div>
+         <p class="text-center text-gray-500 text-sm mt-4">點擊卡片來翻面</p>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const words = [
+                { english: 'Badminton', chinese: '羽毛球' },
+                { english: 'Baseball', chinese: '棒球' },
+                { english: 'Basketball', chinese: '籃球' },
+                { english: 'Football', chinese: '足球' },
+                { english: 'Golf', chinese: '高爾夫' }
+            ];
+            let currentIndex = 0;
+
+            const flashcard = document.getElementById('flashcard');
+            const cardFrontText = document.querySelector('#card-front p');
+            const cardBackText = document.getElementById('english-word');
+            const speakButton = document.getElementById('speak-button');
+            const spellingArea = document.getElementById('spelling-area');
+            const feedbackMessage = document.getElementById('feedback-message');
+            const prevButton = document.getElementById('prev-button');
+            const nextButton = document.getElementById('next-button');
+            const cardCounter = document.getElementById('card-counter');
+
+            // --- Main Function to Update UI ---
+            function updateUI() {
+                const currentWord = words[currentIndex];
+                
+                // Update flashcard
+                cardFrontText.textContent = currentWord.chinese;
+                cardBackText.textContent = currentWord.english;
+                flashcard.classList.remove('is-flipped');
+
+                // Update counter
+                cardCounter.textContent = `${currentIndex + 1} / ${words.length}`;
+                
+                // Create spelling challenge
+                createSpellingChallenge(currentWord.english);
+
+                // Clear feedback message
+                feedbackMessage.textContent = '';
+                feedbackMessage.classList.remove('text-green-500', 'text-red-600');
+            }
+
+            // --- Text-to-Speech Function ---
+            function speak(text) {
+                if ('speechSynthesis' in window) {
+                    // Stop any previous speech
+                    window.speechSynthesis.cancel();
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.lang = 'en-US';
+                    utterance.rate = 0.9;
+                    window.speechSynthesis.speak(utterance);
+                } else {
+                    alert('您的瀏覽器不支援語音功能。');
+                }
+            }
+
+            // --- Spelling Challenge Function ---
+            function createSpellingChallenge(word) {
+                spellingArea.innerHTML = '';
+                const letters = word.split('');
+                
+                letters.forEach((letter, index) => {
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.maxLength = 1;
+                    input.dataset.index = index;
+                    input.dataset.letter = letter.toLowerCase();
+                    input.className = 'spell-input w-12 h-14 text-center text-3xl font-bold border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400';
+                    spellingArea.appendChild(input);
+
+                    input.addEventListener('input', handleSpellingInput);
+                    input.addEventListener('keydown', handleSpellingKeydown);
+                });
+            }
+
+            function handleSpellingInput(e) {
+                const input = e.target;
+                const value = input.value.toLowerCase();
+                const correctLetter = input.dataset.letter;
+
+                // Clear shake animation
+                input.classList.remove('incorrect-input');
+
+                if (value === correctLetter) {
+                    input.classList.add('correct-input');
+                    input.disabled = true;
+                    
+                    const nextInput = input.nextElementSibling;
+                    if (nextInput) {
+                        nextInput.focus();
+                    } else {
+                        checkCompletion();
+                    }
+                } else if (value !== '') {
+                    input.classList.add('incorrect-input');
+                    // Clear the wrong input after shake animation
+                    setTimeout(() => {
+                        input.value = '';
+                        input.classList.remove('incorrect-input');
+                    }, 500);
+                }
+            }
+            
+            function handleSpellingKeydown(e) {
+                if (e.key === 'Backspace' && e.target.value === '') {
+                    const prevInput = e.target.previousElementSibling;
+                    if (prevInput) {
+                        prevInput.focus();
+                    }
+                }
+            }
+
+            function checkCompletion() {
+                const allInputs = document.querySelectorAll('.spell-input');
+                const allCorrect = Array.from(allInputs).every(input => input.classList.contains('correct-input'));
+                if (allCorrect) {
+                    feedbackMessage.textContent = '拼對了！太棒了！';
+                    feedbackMessage.classList.add('text-green-500');
+                    speak('Correct! Great job!');
+                }
+            }
+
+
+            // --- Event Listeners ---
+            flashcard.addEventListener('click', () => {
+                flashcard.classList.toggle('is-flipped');
+            });
+
+            speakButton.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent the card from flipping back
+                speak(words[currentIndex].english);
+            });
+
+            nextButton.addEventListener('click', () => {
+                currentIndex = (currentIndex + 1) % words.length;
+                updateUI();
+            });
+
+            prevButton.addEventListener('click', () => {
+                currentIndex = (currentIndex - 1 + words.length) % words.length;
+                updateUI();
+            });
+
+            // --- Initial Load ---
+            updateUI();
+        });
+    </script>
+</body>
+</html>
